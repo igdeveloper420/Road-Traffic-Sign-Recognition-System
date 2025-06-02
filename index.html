@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>🚦 Traffic Sign Detection</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #ff416c, #ff4b2b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+        }
+
+        input[type="file"] {
+            margin: 10px 0;
+            border: none;
+            background: #fff;
+            color: #333;
+            padding: 10px;
+            border-radius: 10px;
+        }
+
+        input[type="submit"], button {
+            padding: 12px 24px;
+            background: #ff4b2b;
+            border: none;
+            color: white;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        input[type="submit"]:hover, button:hover {
+            background: #ff416c;
+        }
+
+        video, canvas, img {
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 10px;
+        }
+
+        #result {
+            margin-top: 15px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2.2rem; }
+            .section { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <h1> Traffic Sign Detection</h1>
+
+    <div class="section">
+        <h2>📂 Upload Image</h2>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="image" required accept="image/*"><br>
+            <input type="submit" value="Upload and Predict">
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>🎞️ Upload Video</h2>
+        <form method="POST" action="/video_upload" enctype="multipart/form-data">
+            <input type="file" name="video" required accept="video/*"><br>
+            <input type="submit" value="Upload and Predict">
+        </form>
+    </div>
+
+    <div class="section">
+        <h2>📸 Use Webcam</h2>
+        <button onclick="startWebcam()">Start Webcam</button>
+        <button onclick="capture()" id="captureBtn" disabled>Capture & Predict</button>
+        <video id="video" autoplay></video>
+        <canvas id="canvas" width="400" height="300"></canvas>
+        <div id="result"></div>
+    </div>
+
+    {% if label %}
+    <div class="section">
+        <h2>🧠 Prediction: {{ label }}</h2>
+        <p>Confidence: {{ confidence }}%</p>
+        <img src="{{ url_for('static', filename='uploads/' ~ image_file) }}">
+    </div>
+    {% endif %}
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('captureBtn');
+        const resultDiv = document.getElementById('result');
+
+        let streamStarted = false;
+
+        function startWebcam() {
+            if (!streamStarted) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        video.srcObject = stream;
+                        video.style.display = "block";
+                        captureBtn.disabled = false;
+                        streamStarted = true;
+                    })
+                    .catch(err => alert("❌ Failed to access webcam: " + err));
+            }
+        }
+
+        function capture() {
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataURL = canvas.toDataURL('image/jpeg');
+
+            fetch('/webcam', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `webcam_img=${encodeURIComponent(dataURL)}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    resultDiv.innerHTML = `<p style="color:red;">❌ ${data.error}</p>`;
+                } else {
+                    resultDiv.innerHTML = `
+                        <h3>🧠 Prediction: ${data.label}</h3>
+                        <p>Confidence: ${data.confidence}%</p>
+                        <img src="/static/uploads/${data.image_path}?t=${new Date().getTime()}">`;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
